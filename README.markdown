@@ -27,6 +27,7 @@ Table of Contents
 - [Distribution Specific Installation Process](#distribution-specific-installation-process)
   - [Ubuntu / Debian](#ubuntu--debian)
     - [Ubuntu Impish (21.10) / Debian buster (stable) and more recent (stable)](#ubuntu-impish-2110-debian-buster-stable-and-more-recent)
+    - [Ubuntu disco (19.04) / Debian Buster and older](#older)
   - [Fedora / Red Hat / CentOS](#fedora--red-hat--centos)
   - [OpenSUSE](#opensuse)
   - [Arch Linux](#arch-linux)
@@ -286,10 +287,10 @@ Notice: The connect commands allow
 ## NVTOP Build
 
 ```bash
-git clone https://github.com/Syllo/nvtop.git
-mkdir -p nvtop/build && cd nvtop/build
+git clone https://github.com/Alex313031/nvtop && cd nvtop
+mkdir -p build && cd build
 cmake .. -DNVIDIA_SUPPORT=ON -DAMDGPU_SUPPORT=ON -DINTEL_SUPPORT=ON
-make
+make VERBOSE=1
 
 # Install globally on the system
 sudo make install

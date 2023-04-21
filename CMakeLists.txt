@@ -8,6 +8,11 @@ project(nvtop VERSION 3.0.1
   LANGUAGES C CXX)
 
 set(default_build_type "Release")
+set(CMAKE_C_FLAGS_RELEASE "-O3 -g0 -s -mavx -maes -flto=auto -DNDEBUG")
+set(CMAKE_CPP_FLAGS_RELEASE "-O3 -g0 -s -mavx -maes -flto=auto -DNDEBUG")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -g0 -s -mavx -maes -flto=auto -DNDEBUG")
+set(CMAKE_EXE_LINKER_FLAGS_RELEASE "-Wl,-O3 -mavx -maes -flto=auto")
+set(CMAKE_MODULE_LINKER_FLAGS_RELEASE "-Wl,-O3 -mavx -maes -flto=auto")
 # Default build type
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   message(STATUS "Setting build type to '${default_build_type}' as none was specified.")
