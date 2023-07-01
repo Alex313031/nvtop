@@ -460,7 +460,7 @@ static bool gpuinfo_amdgpu_get_device_handles(struct list_head *devices, unsigne
       gpu_infos[amdgpu_count].fd = fd;
       gpu_infos[amdgpu_count].base.vendor = &gpu_vendor_amdgpu;
 
-      snprintf(gpu_infos[*count].base.pdev, PDEV_LEN - 1, "%04x:%02x:%02x.%d", devs[i]->businfo.pci->domain,
+      snprintf(gpu_infos[amdgpu_count].base.pdev, PDEV_LEN - 1, "%04x:%02x:%02x.%d", devs[i]->businfo.pci->domain,
                devs[i]->businfo.pci->bus, devs[i]->businfo.pci->dev, devs[i]->businfo.pci->func);
       initDeviceSysfsPaths(&gpu_infos[amdgpu_count]);
       list_add_tail(&gpu_infos[amdgpu_count].base.list, devices);
@@ -752,9 +752,11 @@ static void gpuinfo_amdgpu_refresh_dynamic_info(struct gpu_info *_gpu_info) {
     int NreadPatterns =
         rewindAndReadPattern(gpu_info->PCIeBW, "%" SCNu64 " %" SCNu64 " %i", &received, &transmitted, &maxPayloadSize);
     if (NreadPatterns == 3) {
-      // Compute received/transmitter in KiB
-      received *= maxPayloadSize / 1024;
-      transmitted *= maxPayloadSize / 1024;
+      received *= maxPayloadSize;
+      transmitted *= maxPayloadSize;
+      // Set in KiB
+      received /= 1024;
+      transmitted /= 1024;
       SET_GPUINFO_DYNAMIC(dynamic_info, pcie_rx, received);
       SET_GPUINFO_DYNAMIC(dynamic_info, pcie_tx, transmitted);
     }
