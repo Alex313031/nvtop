@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.18)
 #                              PROJECT                              #
 #///////////////////////////////////////////////////////////////////#
 
-project(nvtop VERSION 3.0.2
+project(nvtop VERSION 3.1.0
   LANGUAGES C CXX)
 
 set(default_build_type "Release")
@@ -73,6 +73,16 @@ if(APPLE)
   set(MSM_SUPPORT_DEFAULT OFF)
   set(PANFROST_SUPPORT_DEFAULT OFF)
   set(PANTHOR_SUPPORT_DEFAULT OFF)
+  set(ASCEND_SUPPORT_DEFAULT OFF)
+elseif(ASCEND_SUPPORT)
+  set(APPLE_SUPPORT_DEFAULT OFF)
+  set(NVIDIA_SUPPORT_DEFAULT OFF)
+  set(AMDGPU_SUPPORT_DEFAULT OFF)
+  set(INTEL_SUPPORT_DEFAULT OFF)
+  set(MSM_SUPPORT_DEFAULT OFF)
+  set(PANFROST_SUPPORT_DEFAULT OFF)
+  set(PANTHOR_SUPPORT_DEFAULT OFF)
+  set(ASCEND_SUPPORT_DEFAULT ON)
 else()
   set(APPLE_SUPPORT_DEFAULT OFF)
   set(NVIDIA_SUPPORT_DEFAULT ON)
@@ -81,6 +91,7 @@ else()
   set(MSM_SUPPORT_DEFAULT ON)
   set(PANFROST_SUPPORT_DEFAULT ON)
   set(PANTHOR_SUPPORT_DEFAULT ON)
+  set(ASCEND_SUPPORT_DEFAULT OFF)
 endif()
 
 option(NVIDIA_SUPPORT "Build support for NVIDIA GPUs through libnvml" ${NVIDIA_SUPPORT_DEFAULT})
@@ -90,6 +101,7 @@ option(MSM_SUPPORT "Build support for Adreno GPUs through msm driver" ${MSM_SUPP
 option(APPLE_SUPPORT "Build support for Apple GPUs through Metal" ${APPLE_SUPPORT_DEFAULT})
 option(PANFROST_SUPPORT "Build support for Mali GPUs through panfrost driver" ${PANFROST_SUPPORT_DEFAULT})
 option(PANTHOR_SUPPORT "Build support for Mali GPUs through panthor driver" ${PANTHOR_SUPPORT_DEFAULT})
+option(ASCEND_SUPPORT "Build support for Ascend NPUs through Ascend DCMI" ${ASCEND_SUPPORT_DEFAULT})
 
 add_subdirectory(src)
 

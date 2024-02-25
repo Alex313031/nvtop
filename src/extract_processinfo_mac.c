@@ -31,3 +31,8 @@ void processinfo_register_fdinfo_callback(processinfo_fdinfo_callback callback, 
 
 void processinfo_sweep_fdinfos(void) {
 }
+
+void processinfo_enable_disable_callback_for(const struct gpu_info *info, bool enable) {
+  (void)info;
+  (void)enable;
+}
