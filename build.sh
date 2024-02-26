@@ -31,7 +31,7 @@ printf "${bold}${GRE}Script to build nvtop on Linux.${c0}\n" &&
 printf "${YEL}Building nvtop...\n" &&
 printf "${CYA}\n" &&
 
-# Build htop
+# Build nvtop
 export NINJA_SUMMARIZE_BUILD=1 &&
 
 mkdir -p ./build &&
@@ -45,6 +45,4 @@ make VERBOSE=1 V=1 &&
 printf "\n" &&
 printf "${GRE}${bold}Build Completed. ${YEL}${bold}You can now sudo make install or make install to install it.\n" &&
 printf "\n" &&
-tput sgr0 &&
-
-exit 0
+tput sgr0
