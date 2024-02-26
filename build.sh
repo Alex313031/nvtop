@@ -19,13 +19,16 @@ try() { "$@" || die "${RED}Failed $*"; }
 displayHelp () {
 	printf "\n" &&
 	printf "${bold}${GRE}Script to build nvtop on Linux.${c0}\n" &&
+	printf "${bold}${YEL}Use the --build flag to build${c0}\n" &&
+	printf "${bold}${YEL}Use the --clean flag to clean build artifacts${c0}\n" &&
+	printf "${bold}${YEL}Use the --help flag to show this help${c0}\n" &&
 	printf "\n"
 }
-
 case $1 in
 	--help) displayHelp; exit 0;;
 esac
 
+buildNvtop () {
 printf "\n" &&
 printf "${bold}${GRE}Script to build nvtop on Linux.${c0}\n" &&
 printf "${YEL}Building nvtop...\n" &&
@@ -44,5 +47,33 @@ make VERBOSE=1 V=1 &&
 
 printf "\n" &&
 printf "${GRE}${bold}Build Completed. ${YEL}${bold}You can now sudo make install or make install to install it.\n" &&
+printf "\n" &&
+tput sgr0
+}
+case $1 in
+	--build) buildNvtop; exit 0;;
+esac
+
+cleanNvtop () {
+printf "\n" &&
+printf "${YEL}Cleaning build artifacts...${c0}\n" &&
+printf "\n" &&
+
+rm -r -f -v ./build
+
+printf "\n" &&
+printf "${GRE}${bold}Done.\n" &&
+printf "\n" &&
+tput sgr0
+}
+case $1 in
+	--clean) cleanNvtop; exit 0;;
+esac
+
+printf "\n" &&
+printf "${bold}${GRE}Script to build nvtop on Linux.${c0}\n" &&
+printf "${bold}${YEL}Use the --build flag to build${c0}\n" &&
+printf "${bold}${YEL}Use the --clean flag to clean build artifacts${c0}\n" &&
+printf "${bold}${YEL}Use the --help flag to show this help${c0}\n" &&
 printf "\n" &&
 tput sgr0
