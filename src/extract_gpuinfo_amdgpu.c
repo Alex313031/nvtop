@@ -37,7 +37,6 @@
 #include <inttypes.h>
 #include <libdrm/amdgpu.h>
 #include <libdrm/amdgpu_drm.h>
-#include <linux/kcmp.h>
 #include <math.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -69,6 +68,7 @@ static typeof(drmDropMaster) *_drmDropMaster;
 static typeof(amdgpu_device_initialize) *_amdgpu_device_initialize;
 static typeof(amdgpu_device_deinitialize) *_amdgpu_device_deinitialize;
 static typeof(amdgpu_get_marketing_name) *_amdgpu_get_marketing_name;
+static typeof(amdgpu_query_hw_ip_info) *_amdgpu_query_hw_ip_info;
 static typeof(amdgpu_query_gpu_info) *_amdgpu_query_gpu_info;
 static typeof(amdgpu_query_info) *_amdgpu_query_info;
 static typeof(amdgpu_query_sensor_info) *_amdgpu_query_sensor_info;
@@ -219,6 +219,7 @@ static bool gpuinfo_amdgpu_init(void) {
     _amdgpu_device_initialize = dlsym(libdrm_amdgpu_handle, "amdgpu_device_initialize");
     _amdgpu_device_deinitialize = dlsym(libdrm_amdgpu_handle, "amdgpu_device_deinitialize");
     _amdgpu_get_marketing_name = dlsym(libdrm_amdgpu_handle, "amdgpu_get_marketing_name");
+    _amdgpu_query_hw_ip_info = dlsym(libdrm_amdgpu_handle, "amdgpu_query_hw_ip_info");
     _amdgpu_query_info = dlsym(libdrm_amdgpu_handle, "amdgpu_query_info");
     _amdgpu_query_gpu_info = dlsym(libdrm_amdgpu_handle, "amdgpu_query_gpu_info");
     _amdgpu_query_sensor_info = dlsym(libdrm_amdgpu_handle, "amdgpu_query_sensor_info");
@@ -513,6 +514,7 @@ static void gpuinfo_amdgpu_populate_static_info(struct gpu_info *_gpu_info) {
   const char *name = NULL;
 
   static_info->integrated_graphics = false;
+  static_info->encode_decode_shared = false;
   RESET_ALL(static_info->valid);
 
   if (libdrm_amdgpu_handle && _amdgpu_get_marketing_name)
@@ -636,6 +638,14 @@ static void gpuinfo_amdgpu_populate_static_info(struct gpu_info *_gpu_info) {
   if (info_query_success && (info.ids_flags & AMDGPU_IDS_FLAGS_FUSION)) {
     static_info->integrated_graphics = true;
   }
+
+  // Checking if Encode and Decode are unified:AMDGPU_INFO_HW_IP_INFO
+  if (_amdgpu_query_hw_ip_info) {
+    struct drm_amdgpu_info_hw_ip vcn_ip_info;
+    if (_amdgpu_query_hw_ip_info(gpu_info->amdgpu_device, AMDGPU_HW_IP_VCN_ENC, 0, &vcn_ip_info) == 0) {
+      static_info->encode_decode_shared = vcn_ip_info.hw_ip_version_major >= 4;
+    }
+  }
 }
 
 static void gpuinfo_amdgpu_refresh_dynamic_info(struct gpu_info *_gpu_info) {
@@ -646,7 +656,6 @@ static void gpuinfo_amdgpu_refresh_dynamic_info(struct gpu_info *_gpu_info) {
   uint32_t out32;
 
   RESET_ALL(dynamic_info->valid);
-  dynamic_info->encode_decode_shared = false;
 
   if (libdrm_amdgpu_handle && _amdgpu_query_gpu_info)
     info_query_success = !_amdgpu_query_gpu_info(gpu_info->amdgpu_device, &info);
@@ -814,9 +823,6 @@ static bool parse_drm_fdinfo_amd(struct gpu_info *info, FILE *fdinfo_file, struc
       // Client id is a unique identifier. From the DRM documentation "Unique value relating to the open DRM
       // file descriptor used to distinguish duplicated and shared file descriptors. Conceptually the value should map
       // 1:1 to the in kernel representation of struct drm_file instances."
-      // This information is available for the AMDGPU driver shipping with
-      // the kernel >= 5.19. We still have to use the kcmp syscall to
-      // distinguish duplicated file descriptors for older kernels.
       char *endptr;
       cid = strtoul(val, &endptr, 10);
       if (*endptr)
