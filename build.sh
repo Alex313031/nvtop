@@ -46,7 +46,7 @@ cmake .. -DNVIDIA_SUPPORT=ON -DAMDGPU_SUPPORT=ON -DINTEL_SUPPORT=ON &&
 make VERBOSE=1 V=1 &&
 
 printf "\n" &&
-printf "${GRE}${bold}Build Completed. ${YEL}${bold}You can now sudo make install or make install to install it.\n" &&
+printf "${GRE}${bold}Build Completed. ${YEL}${bold}You can now cd to `build` and run `sudo make install` to install it.\n" &&
 printf "\n" &&
 tput sgr0
 }
