@@ -15,7 +15,7 @@
 
     <launchable type="desktop-id">nvtop.desktop</launchable>
 
-    <icon type="stock">nvtop</icon>
+    <icon type="cached">nvtop.svg</icon>
 
     <categories>
         <category>System</category>
@@ -27,11 +27,11 @@
     <screenshots>
         <screenshot type="default">
             <caption>The nvtop interface</caption>
-            <image>https://github.com/Syllo/nvtop/blob/master/screenshot/NVTOP_ex1.png</image>
+            <image>https://raw.githubusercontent.com/Syllo/nvtop/master/screenshot/NVTOP_ex1.png</image>
         </screenshot>
         <screenshot>
             <caption>The nvtop option screen</caption>
-            <image>https://github.com/Syllo/nvtop/blob/master/screenshot/Nvtop-config.png</image>
+            <image>https://raw.githubusercontent.com/Syllo/nvtop/master/screenshot/Nvtop-config.png</image>
         </screenshot>
     </screenshots>
 
