@@ -23,12 +23,12 @@
 #define INTERFACE_INTERNAL_COMMON_H__
 
 #include "nvtop/common.h"
-#include "nvtop/interface_layout_selection.h"
 #include "nvtop/interface_options.h"
 #include "nvtop/interface_ring_buffer.h"
 #include "nvtop/time.h"
 
 #include <ncurses.h>
+#include <stdbool.h>
 
 #define max(a, b) ((a) > (b) ? (a) : (b))
 #define min(a, b) ((a) < (b) ? (a) : (b))
@@ -59,6 +59,7 @@ struct device_window {
   WINDOW *mem_util_no_enc_and_dec;
   WINDOW *encode_util;
   WINDOW *decode_util;
+  WINDOW *encdec_util;
   WINDOW *fan_speed;
   WINDOW *temperature;
   WINDOW *power_info;

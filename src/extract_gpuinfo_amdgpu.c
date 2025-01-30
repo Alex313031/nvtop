@@ -29,7 +29,6 @@
 #include "nvtop/time.h"
 
 #include <assert.h>
-#include <ctype.h>
 #include <dirent.h>
 #include <dlfcn.h>
 #include <errno.h>
@@ -45,7 +44,6 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
-#include <sys/sysmacros.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <uthash.h>
@@ -499,8 +497,10 @@ static int readAttributeFromDevice(nvtop_device *dev, const char *sysAttr, const
   va_start(args, format);
   const char *val;
   int ret = nvtop_device_get_sysattr_value(dev, sysAttr, &val);
-  if (ret < 0)
+  if (ret < 0) {
+    va_end(args);
     return ret;
+  }
   // Read the pattern
   int nread = vsscanf(val, format, args);
   va_end(args);
@@ -714,7 +714,7 @@ static void gpuinfo_amdgpu_refresh_dynamic_info(struct gpu_info *_gpu_info) {
     // TODO: Determine if we want to include GTT (GPU accessible system memory)
     SET_GPUINFO_DYNAMIC(dynamic_info, total_memory, memory_info.vram.total_heap_size);
     SET_GPUINFO_DYNAMIC(dynamic_info, used_memory, memory_info.vram.heap_usage);
-    SET_GPUINFO_DYNAMIC(dynamic_info, free_memory, memory_info.vram.usable_heap_size - dynamic_info->used_memory);
+    SET_GPUINFO_DYNAMIC(dynamic_info, free_memory, memory_info.vram.total_heap_size - dynamic_info->used_memory);
     SET_GPUINFO_DYNAMIC(dynamic_info, mem_util_rate,
                         (dynamic_info->total_memory - dynamic_info->free_memory) * 100 / dynamic_info->total_memory);
   }
@@ -798,6 +798,7 @@ static const char drm_amdgpu_enc[] = "drm-engine-enc";
 
 static bool parse_drm_fdinfo_amd(struct gpu_info *info, FILE *fdinfo_file, struct gpu_process *process_info) {
   struct gpu_info_amdgpu *gpu_info = container_of(info, struct gpu_info_amdgpu, base);
+  struct gpuinfo_static_info *static_info = &gpu_info->base.static_info;
   static char *line = NULL;
   static size_t line_buf_size = 0;
   ssize_t count = 0;
@@ -967,6 +968,12 @@ static bool parse_drm_fdinfo_amd(struct gpu_info *info, FILE *fdinfo_file, struc
       cache_entry->client_id.pid = process_info->pid;
       cache_entry->client_id.pdev = gpu_info->base.pdev;
     }
+
+    // The UI only shows the decode usage when `encode_decode_shared` is true
+    // but amdgpu should only use the encode usage field when it is shared.
+    // Lets add both together for good measure.
+    if (static_info->encode_decode_shared)
+      SET_GPUINFO_PROCESS(process_info, decode_usage, process_info->decode_usage + process_info->encode_usage);
 
 #ifndef NDEBUG
     // We should only process one fdinfo entry per client id per update

@@ -19,16 +19,6 @@
  *
  */
 
-#include <getopt.h>
-#include <ncurses.h>
-#include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-
-#include <locale.h>
-
 #include "nvtop/extract_gpuinfo.h"
 #include "nvtop/info_messages.h"
 #include "nvtop/interface.h"
@@ -36,6 +26,17 @@
 #include "nvtop/interface_options.h"
 #include "nvtop/time.h"
 #include "nvtop/version.h"
+
+#include <getopt.h>
+#include <ncurses.h>
+#include <signal.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#include <locale.h>
 
 static volatile sig_atomic_t signal_exit = 0;
 static volatile sig_atomic_t signal_resize_win = 0;
@@ -236,8 +237,7 @@ int main(int argc, char **argv) {
       allDevicesOptions.gpu_specific_opts[i].to_draw = 0;
     }
   }
-  if (hide_processes_option)
-    allDevicesOptions.hide_processes_list = true;
+  allDevicesOptions.hide_processes_list = hide_processes_option;
   if (encode_decode_timer_option_set) {
     allDevicesOptions.encode_decode_hiding_timer = encode_decode_hide_time;
     if (allDevicesOptions.encode_decode_hiding_timer < 0.)
