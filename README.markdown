@@ -145,6 +145,12 @@ NVTOP supports Rockchip (testing on orangepi 5 plus).
 
 Supports NPU frequency, temperature, utilization.
 
+### MetaX
+
+NVTOP supports MetaX (testing on MXC500) by MXSML LIBRARY.
+
+For more information about GPUs please take a look at the [METAX documentation](https://developer.metax-tech.com/doc/index)
+
 Build
 -----
 
@@ -155,6 +161,8 @@ Several libraries are required in order for NVTOP to display GPU info:
 * For NVIDIA: the *NVIDIA Management Library* (*NVML*) which comes with the GPU driver.
   * This queries the GPU for info.
 * For AMD: the libdrm library used to query AMD GPUs through the kernel driver.
+* For METAX: the *MetaX System Management Library* (*MXSML*) which comes with the GPU driver.
+  * This queries the GPU for info.
 
 ## Distribution Specific Installation Process
 
