@@ -43,7 +43,7 @@ static mxSmlReturn_t (*mxSmlInit)(void);
 
 // Static information and helper functions
 
-static mxSmlReturn_t(*mxSmlGetDeviceCount)(unsigned int *deviceCount);
+static unsigned int (*mxSmlGetDeviceCount)(void);
 
 static const char *(*mxSmlGetErrorString)(mxSmlReturn_t);
 
@@ -97,7 +97,7 @@ typedef enum {
 static mxSmlReturn_t (*mxSmlGetTemperatureInfo)(unsigned int deviceId, mxSmlTemperatureSensors_t sensorType,
                                                int *temp);
 
-// Dynamic infomation extraction
+// Dynamic information extraction
 typedef enum {
   MXSML_Clock_Dla = 1,            //!< Valid for N-class device
   MXSML_Clock_Mc = 2,             //!< Valid for N-class device
@@ -223,7 +223,6 @@ __attribute__((constructor)) static void init_extract_gpuinfo_metax(void) { regi
  *
  */
 static bool gpuinfo_metax_init(void) {
-  printf("gpuinfo_metax_init\n");
   libmxsml_handle = dlopen("/opt/mxdriver/lib/libmxsml.so", RTLD_LAZY);
   if (!libmxsml_handle)
     libmxsml_handle = dlopen("/opt/maca/lib/libmxsml.so", RTLD_LAZY);
@@ -344,13 +343,10 @@ static const char *gpuinfo_metax_last_error_string(void) {
 }
 
 static bool gpuinfo_metax_get_device_handles(struct list_head *devices, unsigned int *count) {
-  printf("gpuinfo_metax_get_device_handles...\n");
   if (!libmxsml_handle)
     return false;
 
-  unsigned int num_devices;
-  mxSmlGetDeviceCount(&num_devices);
-  printf("device count: %u\n", num_devices);
+  unsigned int num_devices = mxSmlGetDeviceCount();
   struct gpu_info_metax *gpu_infos = calloc(num_devices, sizeof(*gpu_infos));
   if (!gpu_infos) {
     local_error_string = strerror(errno);
@@ -364,7 +360,7 @@ static bool gpuinfo_metax_get_device_handles(struct list_head *devices, unsigned
     mxSmlDeviceInfo_t deviceInfo;
     mxSmlReturn_t deviceInfoRet = mxSmlGetDeviceInfo(i, &deviceInfo);
     if (deviceInfoRet != MXSML_SUCCESS) {
-      deviceInfoRet != mxSmlGetLimitedDeviceInfo(i, &deviceInfo);
+      deviceInfoRet = mxSmlGetLimitedDeviceInfo(i, &deviceInfo);
       // Limited device
       if (deviceInfoRet == MXSML_SUCCESS) {
         gpu_infos[*count].device = deviceInfo;
@@ -400,16 +396,17 @@ static void gpuinfo_metax_populate_static_info(struct gpu_info *_gpu_info) {
   mxSmlPcieInfo_t maxPcieInfo;
   last_mxsml_return_status = mxSmlGetPcieMaxLinkInfo(deviceId, &maxPcieInfo);
   if (last_mxsml_return_status == MXSML_SUCCESS) {
-    static_info->max_pcie_gen = maxPcieInfo.speed;
+    static_info->max_pcie_gen = (unsigned)maxPcieInfo.speed;
     static_info->max_pcie_link_width = maxPcieInfo.width;
     SET_VALID(gpuinfo_max_pcie_gen_valid, static_info->valid);
     SET_VALID(gpuinfo_max_pcie_link_width_valid, static_info->valid);
   }
 
-  last_mxsml_return_status = mxSmlGetTemperatureInfo(deviceId, MXSML_Temperature_HotLimit,
-                                                    &static_info->temperature_shutdown_threshold);
+  int shutdown_threshold;
+  last_mxsml_return_status = mxSmlGetTemperatureInfo(deviceId, MXSML_Temperature_HotLimit, &shutdown_threshold);
   if (last_mxsml_return_status == MXSML_SUCCESS) {
     static_info->temperature_slowdown_threshold = 9500;
+    static_info->temperature_shutdown_threshold = shutdown_threshold < 0 ? 0u : (unsigned)shutdown_threshold;
     SET_VALID(gpuinfo_temperature_shutdown_threshold_valid, static_info->valid);
     SET_VALID(gpuinfo_temperature_slowdown_threshold_valid, static_info->valid);
   }
@@ -467,21 +464,30 @@ static void gpuinfo_metax_refresh_dynamic_info(struct gpu_info *_gpu_info) {
   if (gpu_info->device.brand == MXSML_Brand_N)
     usageIp = MXSML_Usage_Dla;
 
-  last_mxsml_return_status = mxSmlGetDeviceIpUsage(deviceId, usageIp, &dynamic_info->gpu_util_rate);
-  if  (last_mxsml_return_status == MXSML_SUCCESS)
+  int gpu_util_rate;
+  last_mxsml_return_status = mxSmlGetDeviceIpUsage(deviceId, usageIp, &gpu_util_rate);
+  if (last_mxsml_return_status == MXSML_SUCCESS) {
+    dynamic_info->gpu_util_rate = gpu_util_rate < 0 ? 0u : (unsigned)gpu_util_rate;
     SET_VALID(gpuinfo_gpu_util_rate_valid, dynamic_info->valid);
+  }
 
   // Encoder utilization rate
   usageIp = MXSML_Usage_Vpue;
-  last_mxsml_return_status = mxSmlGetDeviceIpUsage(deviceId, usageIp, &dynamic_info->encoder_rate);
-  if (last_mxsml_return_status == MXSML_SUCCESS)
+  int encoder_rate;
+  last_mxsml_return_status = mxSmlGetDeviceIpUsage(deviceId, usageIp, &encoder_rate);
+  if (last_mxsml_return_status == MXSML_SUCCESS) {
+    dynamic_info->encoder_rate = encoder_rate < 0 ? 0u : (unsigned)encoder_rate;
     SET_VALID(gpuinfo_encoder_rate_valid, dynamic_info->valid);
+  }
 
   // Decoder utilization rate
   usageIp = MXSML_Usage_Vpud;
-  last_mxsml_return_status = mxSmlGetDeviceIpUsage(deviceId, usageIp, &dynamic_info->decoder_rate);
-  if (last_mxsml_return_status == MXSML_SUCCESS)
+  int decoder_rate;
+  last_mxsml_return_status = mxSmlGetDeviceIpUsage(deviceId, usageIp, &decoder_rate);
+  if (last_mxsml_return_status == MXSML_SUCCESS) {
+    dynamic_info->decoder_rate = decoder_rate < 0 ? 0u : (unsigned)decoder_rate;
     SET_VALID(gpuinfo_decoder_rate_valid, dynamic_info->valid);
+  }
 
   // Device memory vis_vram info (total,used,free)
   mxSmlMemoryInfo_t memory_info;
@@ -493,7 +499,7 @@ static void gpuinfo_metax_refresh_dynamic_info(struct gpu_info *_gpu_info) {
     SET_GPUINFO_DYNAMIC(dynamic_info, mem_util_rate, memory_info.visVramUse * 100 / memory_info.visVramTotal);
   }
 
-  // Pcie generation and width used by the device
+  // PCIe generation and width used by the device
   mxSmlPcieInfo_t pcieInfo;
   last_mxsml_return_status = mxSmlGetPcieInfo(deviceId, &pcieInfo);
   if (last_mxsml_return_status == MXSML_SUCCESS) {
@@ -501,15 +507,23 @@ static void gpuinfo_metax_refresh_dynamic_info(struct gpu_info *_gpu_info) {
     SET_VALID(gpuinfo_pcie_link_width_valid, dynamic_info->valid);
 
     float pcieRates[] = {2.5, 5, 8, 16, 32};
+    // It's the expected interface so float equality should be fine
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfloat-equal"
+#endif
     for (unsigned int i = 0; i < 5; i++) {
       if (pcieRates[i] == pcieInfo.speed) {
         dynamic_info->pcie_link_gen = i + 1;
         SET_VALID(gpuinfo_pcie_link_gen_valid, dynamic_info->valid);
       }
     }
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
   }
 
-  // Pcie eception and transmission throughput
+  // PCIe reception and transmission throughput
   mxSmlPcieThroughput_t pcieThroughput;
   last_mxsml_return_status = mxSmlGetPcieThroughput(deviceId, &pcieThroughput);
   if (last_mxsml_return_status == MXSML_SUCCESS) {
