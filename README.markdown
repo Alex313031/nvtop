@@ -11,7 +11,8 @@ htop-familiar way.
 Currently supported vendors are AMD (Linux amdgpu driver), Apple (limited M1 &
 M2 support), Huawei (Ascend), Intel (Linux i915/Xe drivers), NVIDIA (Linux
 proprietary divers), Qualcomm Adreno (Linux MSM driver), Broadcom VideoCore (Linux v3d driver),
-Rockchip, MetaX (MXSML driver), Enflame (Linux EFML driver).
+Rockchip, MetaX (MXSML driver), Enflame (Linux EFML driver), Tenstorrent (Linux tt-kmd driver).
+Rockchip, MetaX (MXSML driver), Enflame (Linux EFML driver), Iluvatar CoreX (ixML / libixml).
 
 Because a picture is worth a thousand words:
 
@@ -31,10 +32,12 @@ Table of Contents
   - [Adreno](#adreno)
   - [Apple](#apple)
   - [Ascend](#ascend) (only tested on 910B)
+  - [Iluvatar CoreX](#iluvatar-corex)
   - [VideoCore](#videocore)
   - [Rockchip](#rockchip)
   - [MetaX](#metax)
   - [Enflame](#enflame)
+  - [Tenstorrent](#tenstorrent)
 - [Build](#build)
 - [Distribution Specific Installation Process](#distribution-specific-installation-process)
   - [Ubuntu / Debian](#ubuntu--debian)
@@ -48,6 +51,7 @@ Table of Contents
   - [Snap](#snap)
   - [Conda-forge](#conda-forge)
   - [Docker](#docker)
+  - [WSL2](#wsl2)
 - [NVTOP Build](#nvtop-build)
 - [Troubleshoot](#troubleshoot)
 - [License](#license)
@@ -83,8 +87,10 @@ GPU Support
 
 ### AMD
 
-NVTOP supports AMD GPUs using the `amdgpu` driver through the exposed DRM and
+NVTOP supports AMD GPUs using the `amdgpu` driver and the legacy `radeon` driver (legacy GPUs, limited support) through the exposed DRM and
 sysfs interface.
+
+The radeon provides limited metrics compared to amdgpu.
 
 AMD introduced the fdinfo interface in kernel 5.14 ([browse kernel
 source](https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/drivers/gpu/drm/amd/amdgpu/amdgpu_fdinfo.c?h=linux-5.14.y)).
@@ -135,6 +141,15 @@ NVTOP supports Ascend (testing on Altas 800 (910B)) by DCMI API (version 6.0.0).
 
 Currently, the DCMI only supports limited APIs, missing PCIe generation, tx/rx throughput info, max power draw etc.
 
+### Iluvatar CoreX
+
+NVTOP supports Iluvatar CoreX GPUs through the ixML library.
+
+The backend dynamically loads `libixml.so` from `/usr/local/corex/lib`,
+`/usr/local/corex/lib64`, or the default dynamic loader search path. The ixML
+runtime exposes an NVML-compatible API surface used by NVTOP to query device,
+power, PCIe, clock, temperature, memory, and process information.
+
 ### VideoCore
 
 NVTOP supports VideoCore (testing on raspberrypi 4B).
@@ -161,6 +176,12 @@ NVTOP supports Enflame GCUs (testing on Enflame S60, Enflame L300 and Enflame L6
 
 GCU, which refers to General Compute Unit, is a type of accelerator card that is used to perform general-purpose computing tasks just like GPGPU.
 
+### Tenstorrent
+
+NVTOP supports Tenstorrent AI accelerators (Blackhole, Wormhole, Grayskull) through the [tt-kmd](https://github.com/tenstorrent/tt-kmd) kernel driver.
+
+Supports temperature, power draw, AI clock, fan RPM, PCIe link info, and process listing. No external libraries required -- all data is read from sysfs, hwmon, and procfs.
+
 Build
 -----
 
@@ -174,6 +195,8 @@ Several libraries are required in order for NVTOP to display GPU info:
 * For METAX: the *MetaX System Management Library* (*MXSML*) which comes with the GPU driver.
   * This queries the GPU for info.
 * For Enflame: the *Enflame Management Library* (*EFML*) which comes with the GCU driver.
+* For Iluvatar CoreX: the *ixML* runtime library (`libixml.so`) which comes with the driver.
+  * This backend loads the library dynamically at runtime.
 
 ## Distribution Specific Installation Process
 
@@ -360,6 +383,16 @@ pixi global install nvtop
   sudo docker run -it --rm --runtime=nvidia --gpus=all --pid=host nvtop
   ```
 
+### WSL2
+
+Nvtop support in WSL2 mostly boils down to GPU/Accelerator vendor support of
+WSL2. Nvtop should work out of the box for the following configurations:
+
+- NVIDIA: Please refer to [NVIDIA's user guide to get started with CUDA on
+WSL2](https://docs.nvidia.com/cuda/wsl-user-guide/index.html#getting-started-with-cuda-on-wsl)
+to avoid overiding the driver exposed by WSL2 (from Windows) with the NVIDIA
+Linux drivers.
+
 ## NVTOP Build
 
 ```bash
@@ -392,6 +425,15 @@ Troubleshoot
   - Verify that you installed the wide character version of the ncurses library (libncurses**w**5-dev for Debian / Ubuntu), clean the build directory and restart the build process.
 - **Putty**: Tell putty not to lie about its capabilities (`$TERM`) by setting the field ``Terminal-type string`` to ``putty`` in the menu
   ``Connection > Data > Terminal Details``.
+- `NO GPU to monitor.` for NVIDIA GPUs:
+  - `nvtop` loads a shared library named `libnvml.so` (shipped with the NVIDIA
+  drivers) to querry device information. If the library is not present, nvtop
+  will not be able to monitor your NVIDIA device.
+  - On `WSL2`, the installation instructions are slightly different since the
+  driver is being exposed by Windows to the virtual machine (see instruction
+  link in [the WSL2 section](#wsl2)). If you install the NVIDIA linux drivers
+  inside WSL2, you may encounter a version mismatch error or nvtop may silently
+  not work at all.
 
 License
 -------
