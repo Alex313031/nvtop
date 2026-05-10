@@ -202,6 +202,9 @@ static void free_device_windows(struct device_window *dwin) {
   delwin(dwin->temperature);
   delwin(dwin->fan_speed);
   delwin(dwin->pcie_info);
+  delwin(dwin->shader_cores);
+  delwin(dwin->l2_cache_size);
+  delwin(dwin->exec_engines);
 }
 
 static void alloc_process_with_option(struct nvtop_interface *interface, unsigned posX, unsigned posY, unsigned sizeX,
@@ -397,6 +400,7 @@ static void delete_all_windows(struct nvtop_interface *dwin) {
   delwin(dwin->process.option_window.option_win);
   for (size_t i = 0; i < dwin->num_plots; ++i) {
     delwin(dwin->plots[i].win);
+    delwin(dwin->plots[i].plot_window);
     free(dwin->plots[i].data);
   }
   free_setup_window(&dwin->setup_win);
