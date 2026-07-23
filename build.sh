@@ -1,79 +1,311 @@
 #!/bin/bash
 
-# Copyright (c) 2022 Alex313031.
+# Copyright (c) 2026 Alex313031.
 
-YEL='\033[1;33m' # Yellow
-CYA='\033[1;96m' # Cyan
-RED='\033[1;31m' # Red
-GRE='\033[1;32m' # Green
-c0='\033[0m' # Reset Text
-bold='\033[1m' # Bold Text
-underline='\033[4m' # Underline Text
+SCRIPTNAME=$(basename "$0")
+SCRIPTVER="2.0.1"
+
+# Colors
+YEL='\033[1;33m'  # Yellow
+CYA='\033[1;96m'  # Cyan
+RED='\033[1;31m'  # Red
+GRE='\033[1;32m'  # Green
+C0='\033[0;00m'   # Reset Text
+BOLD='\033[1;37m' # Bold Text
+ULINE='\033[4m'   # Underline Text
 
 # Error handling
-yell() { echo "$0: $*" >&2; }
+yell() { printf "%b\n" "$0: $*${C0}" >&2; }
 die() { yell "$*"; exit 111; }
 try() { "$@" || die "${RED}Failed $*"; }
 
-# --help
-displayHelp () {
-	printf "\n" &&
-	printf "${bold}${GRE}Script to build nvtop on Linux.${c0}\n" &&
-	printf "${bold}${YEL}Use the --build flag to build${c0}\n" &&
-	printf "${bold}${YEL}Use the --clean flag to clean build artifacts${c0}\n" &&
-	printf "${bold}${YEL}Use the --help flag to show this help${c0}\n" &&
-	printf "\n"
+export HERE=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
+JOBS=$(getconf _NPROCESSORS_ONLN) # Default to num processors
+
+error_exit() {
+  local error_msg="$1"
+  shift 1
+
+  if [ "$error_msg" ]; then
+    printf "${RED}%s${C0}\n" "$error_msg" >&2
+  else
+    printf "${RED}An error occurred.${C0}\n" >&2
+  fi
+  exit 1
 }
-case $1 in
-	--help) displayHelp; exit 0;;
-esac
 
-buildNvtop () {
-printf "\n" &&
-printf "${bold}${GRE}Script to build nvtop on Linux.${c0}\n" &&
-printf "${YEL}Building nvtop...\n" &&
-printf "${CYA}\n" &&
+arg_error() {
+  local error_msg="$1"
+  shift 1
 
-# Build nvtop
-export NINJA_SUMMARIZE_BUILD=1 &&
-
-mkdir -p ./build &&
-
-cd build &&
-
-cmake .. -DNVIDIA_SUPPORT=ON -DAMDGPU_SUPPORT=ON -DINTEL_SUPPORT=ON &&
-
-make VERBOSE=1 V=1 &&
-
-printf "\n" &&
-printf "${GRE}${bold}Build Completed. ${YEL}${bold}You can now cd to \`build\` and run \`sudo make install\` to install it.\n" &&
-printf "\n" &&
-tput sgr0
+  error_exit "$error_msg, see --help for options"
 }
-case $1 in
-	--build) buildNvtop; exit 0;;
-esac
 
-cleanNvtop () {
-printf "\n" &&
-printf "${YEL}Cleaning build artifacts...${c0}\n" &&
-printf "\n" &&
+show_help() {
+  cat <<EOF
+Usage:
+  $SCRIPTNAME [options] - Builds nvtop for Linux.
 
-rm -r -f -v ./build
-
-printf "\n" &&
-printf "${GRE}${bold}Done.\n" &&
-printf "\n" &&
-tput sgr0
+Options:
+  -h, --help                  Show this help.
+  --version                   Show script version.
+  --deps                      Install prerequisites for using this script (Ubuntu/Debian only).
+  -j <count>, --jobs <count>  Override make job count. (default: $JOBS)
+  -d, --debug                 Create a debug build (default is release mode).
+  -v, --verbose               Show verbose build output.
+  --sse3                      Compiles targeting SSE3.
+  --sse41                     Compiles targeting SSE4.1.
+  --sse42                     Compiles targeting SSE4.2.
+  --avx                       Compiles targeting AVX.
+  --avx2                      Compiles targeting AVX2.
+  --x86                       Compiles for x86.
+  --x64                       Compiles for x86_64.
+  --arm64                     Compiles for arm64.
+  -c, --clean                 Removes the build directory.
+EOF
 }
-case $1 in
-	--clean) cleanNvtop; exit 0;;
-esac
 
-printf "\n" &&
-printf "${bold}${GRE}Script to build nvtop on Linux.${c0}\n" &&
-printf "${bold}${YEL}Use the --build flag to build${c0}\n" &&
-printf "${bold}${YEL}Use the --clean flag to clean build artifacts${c0}\n" &&
-printf "${bold}${YEL}Use the --help flag to show this help${c0}\n" &&
-printf "\n" &&
-tput sgr0
+show_version() {
+  printf "\n ${BOLD} %s Version: ${ULINE}%s${C0}\n\n" "$SCRIPTNAME" "$SCRIPTVER"
+  exit 0
+}
+
+install_deps() {
+  if ! command -v apt-get >/dev/null; then
+    error_exit "--deps only supports apt-based systems (Ubuntu/Debian); install the prerequisites manually"
+  fi
+  # use sudo only when not already root (e.g. plain CI containers lack sudo)
+  local sudo=""
+  [ "$(id -u)" -ne 0 ] && sudo="sudo"
+
+  printf "${GRE}Installing dependencies for $SCRIPTNAME...${C0}\n"
+  $sudo apt-get update || error_exit "apt-get update failed"
+  # libncursesw5-dev:            UI; the wide variant is preferred for unicode
+  # libdrm-dev:                  required by the AMDGPU/RADEON/INTEL/MSM/
+  #                              PANFROST/PANTHOR backends
+  # libsystemd-dev, libudev-dev: device discovery; at least one is required
+  #                              by the AMDGPU/RADEON/INTEL/V3D backends
+  # (NVIDIA needs no build deps: nvml is bundled and loaded at runtime)
+  # For a 32 bit build, also install gcc-multilib and the i386 dev libraries
+  $sudo apt-get install -y \
+        build-essential gcc cmake pkg-config \
+        libncurses5-dev libncursesw5-dev libdrm-dev libsystemd-dev libudev-dev \
+      || error_exit "Failed to install dependencies"
+  printf "${GRE}Done installing dependencies!${C0}\n"
+}
+
+clean () {
+  cd "$HERE" || error_exit "Could not cd into $HERE"
+  [ -d build ] || error_exit "Nothing to clean (no build directory in $HERE)"
+  printf "\n${YEL}Removing the build directory..."
+  printf "${CYA}\n"
+  rm -rf build || error_exit "Failed to remove the build directory"
+  printf "\n${GRE}${BOLD}Done. ${C0}\n"
+}
+
+build () {
+  if [ "$IS_ARM" == "1" ] && [ -n "$USE_SSE3$USE_SSE41$USE_SSE42$USE_AVX$USE_AVX2" ]; then
+    error_exit "SSE/AVX flags cannot be combined with an arm64 target"
+  fi
+  if [ "$IS_X86" == "1" ] && [ -n "$USE_AVX$USE_AVX2" ]; then
+    error_exit "AVX flags require an x64 target"
+  fi
+
+  local _startmsg="Building nvtop"
+  local MFLAG=""
+  if [ "$IS_ARM" == "1" ]; then
+    _startmsg+=" (arm64)"
+    local SIMD_FLAGS="-march=armv8-a+simd"
+  elif [ "$IS_X86" == "1" ] || [ "$IS_X64" == "1" ]; then
+    local SIMD_FLAGS="-mfpmath=sse"
+    if [ "$IS_X86" == "1" ]; then
+      _startmsg+=" x86"
+      MFLAG+="-m32"
+      # SSE2 baseline
+      if [ -z "$USE_SSE3$USE_SSE41$USE_SSE42" ]; then
+        _startmsg+=" (SSE2 Version)"
+        SIMD_FLAGS+=" -mfxsr -msse2"
+      fi
+      if [ "$USE_SSE3" == "1" ]; then
+        _startmsg+=" (SSE3 Version)"
+        SIMD_FLAGS+=" -msse3"
+      fi
+      if [ "$USE_SSE41" == "1" ]; then
+        _startmsg+=" (SSE4.1 Version)"
+        SIMD_FLAGS+=" -mssse3 -msse4.1"
+      fi
+      if [ "$USE_SSE42" == "1" ]; then
+        _startmsg+=" (SSE4.2 Version)"
+        SIMD_FLAGS+=" -msse4.2"
+      fi
+    elif [ "$IS_X64" == "1" ]; then
+      _startmsg+=" x64"
+      MFLAG+="-m64"
+      if [ -z "$USE_SSE3$USE_SSE41$USE_SSE42$USE_AVX$USE_AVX2" ]; then
+        _startmsg+=" (SSE2 Version)"
+        SIMD_FLAGS+=" -msse2 -march=x86-64"
+      fi
+      if [ "$USE_SSE3" == "1" ]; then
+        _startmsg+=" (SSE3 Version)"
+        SIMD_FLAGS+=" -msse3"
+      fi
+      if [ "$USE_SSE41" == "1" ]; then
+        _startmsg+=" (SSE4.1 Version)"
+        SIMD_FLAGS+=" -mssse3 -msse4.1"
+      fi
+      if [ "$USE_SSE42" == "1" ]; then
+        _startmsg+=" (SSE4.2 Version)"
+        SIMD_FLAGS+=" -msse4.2 -march=x86-64-v2"
+      fi
+      if [ "$USE_AVX" == "1" ]; then
+        _startmsg+=" (AVX Version)"
+        SIMD_FLAGS+=" -mavx -maes"
+      fi
+      if [ "$USE_AVX2" == "1" ]; then
+        _startmsg+=" (AVX2 Version)"
+        SIMD_FLAGS+=" -mavx2 -mfma -march=x86-64-v3"
+      fi
+    fi
+  else
+    error_exit "Unsupported arch"
+  fi
+
+  printf "\n${YEL}${_startmsg} using ${JOBS} jobs...${C0}\n"
+
+  local OPT_FLAGS="${SIMD_FLAGS}"
+  if [ "$IS_DEBUG" = "1" ]; then
+    OPT_FLAGS+=" -Og -g2"
+    local LTO_FLAGS="-Wl,-O0"
+    local STRIP_FLAG=""
+    local BUILD_TYPE="Debug"
+  else
+    OPT_FLAGS+=" -O3 -g0 -DNDEBUG"
+    local LTO_FLAGS="-Wl,-O3 -flto=auto"
+    local STRIP_FLAG="-s"
+    local BUILD_TYPE="Release"
+  fi
+
+  # CMake folds these into CMAKE_C_FLAGS/CMAKE_EXE_LINKER_FLAGS at configure
+  export CFLAGS="${OPT_FLAGS} ${LTO_FLAGS} ${MFLAG}"
+  export CXXFLAGS="${OPT_FLAGS} ${LTO_FLAGS} ${MFLAG}"
+  export LDFLAGS="${LTO_FLAGS} ${STRIP_FLAG} -static-libgcc"
+
+  if [ "$VERBOSE" = "1" ]; then
+    local VFLAG="VERBOSE=1 V=1"
+    printf "${CYA}CFLAGS   ${C0}= ${BOLD}${CFLAGS} ${C0}\n"
+    printf "${CYA}CXXFLAGS ${C0}= ${BOLD}${CXXFLAGS} ${C0}\n"
+    printf "${CYA}LDFLAGS  ${C0}= ${BOLD}${LDFLAGS} ${C0}\n"
+  else
+    local VFLAG=""
+    printf "${CYA}SIMD_FLAGS ${C0}= ${BOLD}${SIMD_FLAGS} ${C0}\n"
+  fi
+
+  printf "${CYA}\n"
+
+  cd "$HERE" || error_exit "Could not cd into $HERE"
+
+  # Remove build entirely: cmake caches flags, so a stale cache from a
+  # previous SIMD variant would end up in this one
+  rm -rf build
+  mkdir -p build
+  cd build || error_exit "Could not cd into build"
+
+  # GPU backends not listed here follow nvtop's arch-aware defaults
+  try cmake .. -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+        -DNVIDIA_SUPPORT=ON -DAMDGPU_SUPPORT=ON -DINTEL_SUPPORT=ON
+
+  try make $VFLAG -j $JOBS
+
+  printf "${GRE}\nBuild Completed. ${BOLD}You can now run \`sudo make install\` or \`make install\` from the \`build\` directory to install it.${C0}\n"
+}
+
+# Cmdline handling
+while :; do
+  case $1 in
+    -h|--help)
+        show_help
+        exit 0
+        ;;
+    --version)
+        show_version
+        ;;
+    --deps)
+        install_deps
+        exit 0
+        ;;
+    -v|--verbose)
+        VERBOSE=1
+        ;;
+    -d|--debug)
+        IS_DEBUG=1
+        ;;
+    -c|--clean)
+        clean
+        exit 0
+        ;;
+    -j|--jobs)
+        if [[ "$2" =~ ^[1-9][0-9]*$ ]]; then
+          JOBS=$2
+          shift
+        else
+          arg_error "'--jobs' requires a numeric argument"
+        fi
+        ;;
+    --sse3)
+        USE_SSE3=1
+        ;;
+    --sse41)
+        USE_SSE41=1
+        ;;
+    --sse42)
+        USE_SSE42=1
+        ;;
+    --avx)
+        IS_X64=1
+        USE_AVX=1
+        ;;
+    --avx2)
+        IS_X64=1
+        USE_AVX2=1
+        ;;
+    --x86|-32|--i686|--x32)
+        IS_X86=1
+        IS_X64=0
+        IS_ARM=0
+        ;;
+    --x64|-64|--amd64|--x86_64)
+        IS_X86=0
+        IS_X64=1
+        IS_ARM=0
+        ;;
+    --arm|-arm|--arm64|-arm64)
+        IS_X86=0
+        IS_X64=0
+        IS_ARM=1
+        ;;
+    --)
+        shift
+        break
+        ;;
+    -?*)
+        arg_error "Unknown option '$1'"
+        ;;
+    *)
+        break
+  esac
+
+  shift
+done
+
+# default to the host arch when none was given
+if [ -z "$IS_X86$IS_X64$IS_ARM" ]; then
+  case "$(uname -m)" in
+    x86_64)        IS_X64=1 ;;
+    aarch64|arm64) IS_ARM=1 ;;
+    i?86)          IS_X86=1 ;;
+    *) error_exit "Unknown host arch '$(uname -m)'; pass --x86, --x64, or --arm64" ;;
+  esac
+fi
+
+build
